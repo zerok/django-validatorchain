@@ -116,3 +116,29 @@ def test_form_validation_empty_value():
 
     text = CharField(validators=ValidatorChain().add(require_value), required=False)
     text.clean('')
+
+
+def test_form_validation():
+    runs = []
+
+    def validator_1(val):
+        nonlocal runs
+        runs.append(1)
+        raise ValidationError("validator 1 failed as expected")
+        pass
+
+    def validator_2(val):
+        nonlocal runs
+        runs.append(2)
+        pass
+
+    text = CharField(validators=ValidatorChain().add(validator_1).add(validator_2, skip_on_error=True))
+    with pytest.raises(ValidationError):
+        text.clean('invalid')
+
+    print(runs)
+
+    # This should actually be [1] but in 2017
+    # https://github.com/django/django/blob/92309e53d9921a60e667656d8dd65e59eb5cf81c/django/forms/fields.py#L116
+    # was introduced which makes the approach here no longer feasible.
+    assert runs == [1, 2]
