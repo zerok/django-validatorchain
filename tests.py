@@ -1,4 +1,7 @@
 from validatorchain import ValidatorChain
+from django.forms import CharField
+from django.core.exceptions import ValidationError
+import pytest
 
 
 def test_skip_on_error():
@@ -83,3 +86,33 @@ def test_addition():
     assert len(result) == 2
     assert result._data[0].skip_on_error
     assert not result._data[1].skip_on_error
+
+
+def test_form_validation():
+    text = CharField(validators=[])
+    text.clean('invalid')
+
+    def require_value(val):
+        if val == 'invalid':
+            raise ValidationError("Invalid value!")
+
+    text = CharField(validators=ValidatorChain().add(require_value))
+    with pytest.raises(ValidationError):
+        text.clean('invalid')
+
+def test_form_validation_empty_value():
+    """
+    If you allow empty values then no validators are executed by Django itself
+    hence in this case no exception will be raised by the require_value
+    validator.
+
+    This is due to https://github.com/django/django/blob/master/django/forms/fields.py#L131
+    """
+    text = CharField(validators=[], required=False)
+    text.clean('')
+
+    def require_value(val):
+        raise ValidationError("Invalid value!")
+
+    text = CharField(validators=ValidatorChain().add(require_value), required=False)
+    text.clean('')
